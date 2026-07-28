@@ -1,7 +1,7 @@
 // 共通UI部品 — Toast・バッジ・モーダル・チャートなど
 
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
 import type { MemberRank, MemberStatus } from '../types';
 import { RANK_LABELS, RANK_CASHBACK } from '../types';
@@ -216,11 +216,16 @@ export function LineChart({
   data,
   height = 160,
   color = '#4f46e5',
+  showTooltip = false,
+  tooltipUnit = '件',
 }: {
   data: { label: string; value: number }[];
   height?: number;
   color?: string;
+  showTooltip?: boolean;
+  tooltipUnit?: string;
 }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const width = 520;
   const pad = { top: 20, right: 20, bottom: 30, left: 40 };
   const cw = width - pad.left - pad.right;
@@ -238,53 +243,100 @@ export function LineChart({
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   const areaD = `${pathD} L ${pad.left + cw} ${pad.top + ch} L ${pad.left} ${pad.top + ch} Z`;
 
+  const hovered = hoveredIndex !== null ? points[hoveredIndex] : null;
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height }}>
-      <defs>
-        <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* グリッド */}
-      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-        <line
-          key={t}
-          x1={pad.left}
-          y1={pad.top + ch * t}
-          x2={pad.left + cw}
-          y2={pad.top + ch * t}
-          stroke="#e2e8f0"
-          strokeWidth="1"
-        />
-      ))}
-      {/* エリア */}
-      <path d={areaD} fill="url(#lineGrad)" />
-      {/* ライン */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {/* ポイント */}
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r="4" fill="white" stroke={color} strokeWidth="2.5" />
-          <text x={p.x} y={pad.top + ch + 18} textAnchor="middle" className="fill-slate-500" style={{ fontSize: 10 }}>
-            {p.label}
+    <div className="relative">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height }}>
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* グリッド */}
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+          <line
+            key={t}
+            x1={pad.left}
+            y1={pad.top + ch * t}
+            x2={pad.left + cw}
+            y2={pad.top + ch * t}
+            stroke="#e2e8f0"
+            strokeWidth="1"
+          />
+        ))}
+        {/* エリア */}
+        <path d={areaD} fill="url(#lineGrad)" />
+        {/* ライン */}
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* ポイント */}
+        {points.map((p, i) => (
+          <g key={i}>
+            {showTooltip && (
+              <rect
+                x={p.x - cw / data.length / 2}
+                y={pad.top}
+                width={cw / data.length}
+                height={ch + pad.bottom}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              />
+            )}
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={hoveredIndex === i ? 6 : 4}
+              fill="white"
+              stroke={color}
+              strokeWidth="2.5"
+              className={showTooltip ? 'pointer-events-none' : undefined}
+            />
+            <text
+              x={p.x}
+              y={pad.top + ch + 18}
+              textAnchor="middle"
+              className={`fill-slate-500 ${showTooltip ? 'cursor-pointer' : ''}`}
+              style={{ fontSize: 10 }}
+              onMouseEnter={showTooltip ? () => setHoveredIndex(i) : undefined}
+              onMouseLeave={showTooltip ? () => setHoveredIndex(null) : undefined}
+            >
+              {p.label}
+            </text>
+          </g>
+        ))}
+        {/* Y軸ラベル */}
+        {[0, 0.5, 1].map((t) => (
+          <text
+            key={t}
+            x={pad.left - 8}
+            y={pad.top + ch * (1 - t) + 4}
+            textAnchor="end"
+            className="fill-slate-400"
+            style={{ fontSize: 10 }}
+          >
+            {Math.round(min + range * t).toLocaleString()}
           </text>
-        </g>
-      ))}
-      {/* Y軸ラベル */}
-      {[0, 0.5, 1].map((t) => (
-        <text
-          key={t}
-          x={pad.left - 8}
-          y={pad.top + ch * (1 - t) + 4}
-          textAnchor="end"
-          className="fill-slate-400"
-          style={{ fontSize: 10 }}
+        ))}
+      </svg>
+      {showTooltip && hovered && (
+        <div
+          className="pointer-events-none absolute z-10 rounded-lg bg-slate-800 px-3 py-2 text-xs text-white shadow-lg"
+          style={{
+            left: `${(hovered.x / width) * 100}%`,
+            top: `${((hovered.y - 12) / height) * 100}%`,
+            transform: 'translate(-50%, -100%)',
+          }}
         >
-          {Math.round(min + range * t).toLocaleString()}
-        </text>
-      ))}
-    </svg>
+          <p className="font-semibold">{hovered.label}</p>
+          <p className="mt-0.5 text-brand-200">
+            会員数: <span className="font-bold text-white">{hovered.value.toLocaleString()}{tooltipUnit}</span>
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
