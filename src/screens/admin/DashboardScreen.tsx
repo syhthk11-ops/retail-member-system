@@ -114,7 +114,7 @@ export function DashboardScreen() {
               <h2 className="text-base font-bold text-slate-800">会員数推移</h2>
               <span className="ml-auto text-xs text-slate-400">過去7ヶ月</span>
             </div>
-            <LineChart data={memberTrend} height={200} />
+            <LineChart data={memberTrend} height={200} showTooltip tooltipUnit="件" />
           </div>
 
           {/* ランク分布 */}
