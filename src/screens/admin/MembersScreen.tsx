@@ -2,11 +2,22 @@
 // 検索・ステータス絞り込み・ランク絞り込み・アクション（ステータス切替・詳細・CSV）
 
 import { useMemo, useState } from 'react';
-import { Search, Users, Download, Eye, Power, ChevronRight } from 'lucide-react';
+import { Search, Users, Download, Eye, Power, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../store/AppStore';
 import { useRouter } from '../../store/Router';
 import { RankBadge, StatusBadge, formatDate } from '../../components/ui';
-import type { MemberRank, MemberStatus } from '../../types';
+import type { MemberRank, MemberStatus, Member } from '../../types';
+
+type SortKey = 'name' | 'rank' | 'createdAt' | 'favorites' | 'status';
+type SortDir = 'asc' | 'desc';
+
+const RANK_ORDER: Record<MemberRank, number> = { platinum: 0, gold: 1, silver: 2 };
+const STATUS_ORDER: Record<MemberStatus, number> = { active: 0, suspended: 1 };
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ChevronUp className="h-3 w-3 opacity-30" />;
+  return dir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
+}
 
 export function MembersScreen() {
   const { members, setMemberStatus, showToast, currentUser } = useAppStore();
@@ -14,6 +25,55 @@ export function MembersScreen() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | MemberStatus>('all');
   const [rankFilter, setRankFilter] = useState<'all' | MemberRank>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortMembers = (list: Member[]) => {
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name, 'ja');
+          break;
+        case 'rank':
+          cmp = RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
+          break;
+        case 'createdAt':
+          cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case 'favorites':
+          cmp = a.favoritedProductIds.length - b.favoritedProductIds.length;
+          break;
+        case 'status':
+          cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  };
+
+  const filtered = useMemo(() => {
+    const result = members.filter((m) => {
+      const sMatch = statusFilter === 'all' || m.status === statusFilter;
+      const rMatch = rankFilter === 'all' || m.rank === rankFilter;
+      const searchMatch =
+        m.name.toLowerCase().includes(search.toLowerCase()) ||
+        m.email.toLowerCase().includes(search.toLowerCase());
+      return sMatch && rMatch && searchMatch;
+    });
+    return sortMembers(result);
+  }, [members, search, statusFilter, rankFilter, sortKey, sortDir]);
 
   if (!currentUser || currentUser.role !== 'admin') {
     return (
@@ -25,17 +85,6 @@ export function MembersScreen() {
       </div>
     );
   }
-
-  const filtered = useMemo(() => {
-    return members.filter((m) => {
-      const sMatch = statusFilter === 'all' || m.status === statusFilter;
-      const rMatch = rankFilter === 'all' || m.rank === rankFilter;
-      const searchMatch =
-        m.name.toLowerCase().includes(search.toLowerCase()) ||
-        m.email.toLowerCase().includes(search.toLowerCase());
-      return sMatch && rMatch && searchMatch;
-    });
-  }, [members, search, statusFilter, rankFilter]);
 
   const handleToggleStatus = async (memberId: string, current: MemberStatus) => {
     const newStatus: MemberStatus = current === 'active' ? 'suspended' : 'active';
@@ -102,11 +151,51 @@ export function MembersScreen() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">会員</th>
-                  <th className="hidden px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 md:table-cell">ランク</th>
-                  <th className="hidden px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 lg:table-cell">登録日</th>
-                  <th className="hidden px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 sm:table-cell">お気に入り</th>
-                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">ステータス</th>
+                  <th className="px-4 py-3">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      会員
+                      <SortIcon active={sortKey === 'name'} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="hidden px-4 py-3 md:table-cell">
+                    <button
+                      onClick={() => handleSort('rank')}
+                      className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      ランク
+                      <SortIcon active={sortKey === 'rank'} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="hidden px-4 py-3 lg:table-cell">
+                    <button
+                      onClick={() => handleSort('createdAt')}
+                      className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      登録日
+                      <SortIcon active={sortKey === 'createdAt'} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="hidden px-4 py-3 sm:table-cell">
+                    <button
+                      onClick={() => handleSort('favorites')}
+                      className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      お気に入り
+                      <SortIcon active={sortKey === 'favorites'} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      ステータス
+                      <SortIcon active={sortKey === 'status'} dir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">アクション</th>
                 </tr>
               </thead>
