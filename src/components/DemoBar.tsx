@@ -63,19 +63,28 @@ export function DemoBar() {
 
   const currentScreen = SCREENS.find((s) => s.path === path);
 
+  const handleHomeNavigate = () => {
+    const isAdmin = currentUser?.role === 'admin' || (!currentUser && viewMode === 'admin');
+    navigate(isAdmin ? '/admin/dashboard' : '/products');
+  };
+
   return (
     <div className="sticky top-0 z-[100] border-b border-brand-950/50 bg-gradient-to-r from-brand-950 via-brand-900 to-brand-950 shadow-lg">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
-        {/* ブランド */}
-        <div className="flex items-center gap-2">
+        {/* ブランド — クリックでホーム画面へ */}
+        <button
+          onClick={handleHomeNavigate}
+          className="flex items-center gap-2 rounded-lg transition-colors hover:bg-brand-800/50 active:scale-[0.98]"
+          title={currentUser?.role === 'admin' || (!currentUser && viewMode === 'admin') ? 'エグゼクティブ・ダッシュボードへ' : '新着商品一覧へ'}
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 shadow-md">
             <Sparkles className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
           </div>
-          <div className="hidden sm:block">
+          <div className="hidden text-left sm:block">
             <p className="text-sm font-bold leading-tight text-white">Retail Member Cloud</p>
             <p className="text-[10px] leading-tight text-brand-300">Presales Demo Console</p>
           </div>
-        </div>
+        </button>
 
         <div className="hidden h-8 w-px bg-brand-700/60 sm:block" />
 
